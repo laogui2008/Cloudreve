@@ -3,13 +3,15 @@ package filesystem
 import (
 	"context"
 	"fmt"
+	"path"
+	"strings"
+
 	model "github.com/HFO4/cloudreve/models"
+	"github.com/HFO4/cloudreve/pkg/cache"
 	"github.com/HFO4/cloudreve/pkg/filesystem/fsctx"
 	"github.com/HFO4/cloudreve/pkg/hashid"
 	"github.com/HFO4/cloudreve/pkg/serializer"
 	"github.com/HFO4/cloudreve/pkg/util"
-	"path"
-	"strings"
 )
 
 /* =================
@@ -177,6 +179,8 @@ func (fs *FileSystem) Delete(ctx context.Context, dirs, files []uint, force bool
 			// 已成功删除的文件
 			deletedFileIDs = append(deletedFileIDs, fs.FileTarget[i].ID)
 			deletedStorage[fs.FileTarget[i].ID] = fs.FileTarget[i].Size
+			// 删除缓存数据，解决同一文件短时间内上传下载删除再上传下载报错的问题
+			cache.Deletes([]string{fs.FileTarget[i].SourceName}, fmt.Sprintf("onedrive_source_%d_", fs.FileTarget[i].PolicyID))
 		}
 		// 全部文件
 		totalStorage[fs.FileTarget[i].ID] = fs.FileTarget[i].Size
