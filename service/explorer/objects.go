@@ -47,6 +47,14 @@ type ItemIDService struct {
 	Source *ItemService
 }
 
+// ItemDeleteService 处理多文件/目录删除服务，字段值为HashID，可通过Raw()方法获取原始ID
+type ItemDeleteService struct {
+	Items                []string `json:"items"`
+	Dirs                 []string `json:"dirs"`
+	DeleteSourceFileFlag bool     `json:"deleteSourceFileFlag"`
+	Source               *ItemService
+}
+
 // ItemCompressService 文件压缩任务服务
 type ItemCompressService struct {
 	Src  ItemIDService `json:"src"`
@@ -62,6 +70,31 @@ type ItemDecompressService struct {
 
 // Raw 批量解码HashID，获取原始ID
 func (service *ItemIDService) Raw() *ItemService {
+	if service.Source != nil {
+		return service.Source
+	}
+
+	service.Source = &ItemService{
+		Dirs:  make([]uint, 0, len(service.Dirs)),
+		Items: make([]uint, 0, len(service.Items)),
+	}
+	for _, folder := range service.Dirs {
+		id, err := hashid.DecodeHashID(folder, hashid.FolderID)
+		if err == nil {
+			service.Source.Dirs = append(service.Source.Dirs, id)
+		}
+	}
+	for _, file := range service.Items {
+		id, err := hashid.DecodeHashID(file, hashid.FileID)
+		if err == nil {
+			service.Source.Items = append(service.Source.Items, id)
+		}
+	}
+
+	return service.Source
+}
+
+func (service *ItemDeleteService) DeleteRaw() *ItemService {
 	if service.Source != nil {
 		return service.Source
 	}
@@ -271,6 +304,28 @@ func (service *ItemIDService) Delete(ctx context.Context, c *gin.Context) serial
 	// 删除对象
 	items := service.Raw()
 	err = fs.Delete(ctx, items.Dirs, items.Items, false)
+	if err != nil {
+		return serializer.Err(serializer.CodeNotSet, err.Error(), err)
+	}
+
+	return serializer.Response{
+		Code: 0,
+	}
+
+}
+
+// Delete 删除对象（根据deleteSourceFileFlag标识，决定是否删除源文件）
+func (service *ItemDeleteService) Delete(ctx context.Context, c *gin.Context) serializer.Response {
+	// 创建文件系统
+	fs, err := filesystem.NewFileSystemFromContext(c)
+	if err != nil {
+		return serializer.Err(serializer.CodePolicyNotAllowed, err.Error(), err)
+	}
+	defer fs.Recycle()
+
+	// 删除对象
+	items := service.DeleteRaw()
+	err = fs.DeleteDBAndSourceFile(ctx, items.Dirs, items.Items, false, service.DeleteSourceFileFlag)
 	if err != nil {
 		return serializer.Err(serializer.CodeNotSet, err.Error(), err)
 	}

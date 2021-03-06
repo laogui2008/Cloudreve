@@ -13,7 +13,7 @@ func Delete(c *gin.Context) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	var service explorer.ItemIDService
+	var service explorer.ItemDeleteService
 	if err := c.ShouldBindJSON(&service); err == nil {
 		res := service.Delete(ctx, c)
 		c.JSON(200, res)
