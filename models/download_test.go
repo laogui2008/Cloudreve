@@ -2,10 +2,11 @@ package model
 
 import (
 	"errors"
+	"testing"
+
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestDownload_Create(t *testing.T) {
@@ -176,4 +177,15 @@ func TestDownload_Delete(t *testing.T) {
 		asserts.NoError(err)
 	}
 
+}
+
+func TestDownload_GetNodeID(t *testing.T) {
+	a := assert.New(t)
+	record := Download{}
+
+	// compatible with 3.4
+	a.EqualValues(1, record.GetNodeID())
+
+	record.NodeID = 5
+	a.EqualValues(5, record.GetNodeID())
 }

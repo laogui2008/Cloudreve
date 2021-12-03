@@ -2,15 +2,12 @@ package scripts
 
 import (
 	"context"
+
 	model "github.com/cloudreve/Cloudreve/v3/models"
 	"github.com/cloudreve/Cloudreve/v3/pkg/util"
 )
 
 type UserStorageCalibration int
-
-func init() {
-	register("CalibrateUserStorage", UserStorageCalibration(0))
-}
 
 type storageResult struct {
 	Total uint64

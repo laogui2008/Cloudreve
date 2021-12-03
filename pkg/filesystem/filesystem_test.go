@@ -3,6 +3,10 @@ package filesystem
 import (
 	"net/http/httptest"
 
+	"github.com/cloudreve/Cloudreve/v3/pkg/cluster"
+	"github.com/cloudreve/Cloudreve/v3/pkg/filesystem/driver/shadow/masterinslave"
+	"github.com/cloudreve/Cloudreve/v3/pkg/filesystem/driver/shadow/slaveinmaster"
+
 	"github.com/DATA-DOG/go-sqlmock"
 	model "github.com/cloudreve/Cloudreve/v3/models"
 	"github.com/cloudreve/Cloudreve/v3/pkg/cache"
@@ -101,6 +105,10 @@ func TestDispatchHandler(t *testing.T) {
 	asserts.NoError(err)
 
 	fs.Policy = &model.Policy{Type: "onedrive"}
+	err = fs.DispatchHandler()
+	asserts.NoError(err)
+
+	fs.Policy = &model.Policy{Type: "cos"}
 	err = fs.DispatchHandler()
 	asserts.NoError(err)
 
@@ -260,5 +268,42 @@ func TestFileSystem_SetTargetByInterface(t *testing.T) {
 		asserts.NoError(fs.SetTargetByInterface(&model.File{}))
 		asserts.Len(fs.DirTarget, 1)
 		asserts.Len(fs.FileTarget, 1)
+	}
+}
+
+func TestFileSystem_SwitchToSlaveHandler(t *testing.T) {
+	a := assert.New(t)
+	fs := FileSystem{
+		User: &model.User{},
+	}
+	mockNode := &cluster.MasterNode{
+		Model: &model.Node{},
+	}
+	fs.SwitchToSlaveHandler(mockNode)
+	a.IsType(&slaveinmaster.Driver{}, fs.Handler)
+}
+
+func TestFileSystem_SwitchToShadowHandler(t *testing.T) {
+	a := assert.New(t)
+	fs := FileSystem{
+		User:   &model.User{},
+		Policy: &model.Policy{},
+	}
+	mockNode := &cluster.MasterNode{
+		Model: &model.Node{},
+	}
+
+	// local to remote
+	{
+		fs.Policy.Type = "local"
+		fs.SwitchToShadowHandler(mockNode, "", "")
+		a.IsType(&masterinslave.Driver{}, fs.Handler)
+	}
+
+	// onedrive
+	{
+		fs.Policy.Type = "onedrive"
+		fs.SwitchToShadowHandler(mockNode, "", "")
+		a.IsType(&masterinslave.Driver{}, fs.Handler)
 	}
 }

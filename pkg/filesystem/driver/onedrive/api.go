@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cloudreve/Cloudreve/v3/pkg/conf"
+
 	model "github.com/cloudreve/Cloudreve/v3/models"
 	"github.com/cloudreve/Cloudreve/v3/pkg/cache"
 	"github.com/cloudreve/Cloudreve/v3/pkg/filesystem/fsctx"
@@ -53,22 +55,33 @@ func (err RespError) Error() string {
 	return err.APIError.Message
 }
 
-func (client *Client) getRequestURL(api string) string {
+func (client *Client) getRequestURL(api string, opts ...Option) string {
+	options := newDefaultOption()
+	for _, o := range opts {
+		o.apply(options)
+	}
+
 	base, _ := url.Parse(client.Endpoints.EndpointURL)
 	if base == nil {
 		return ""
 	}
-	base.Path = path.Join(base.Path, api)
+
+	if options.useDriverResource {
+		base.Path = path.Join(base.Path, client.Endpoints.DriverResource, api)
+	} else {
+		base.Path = path.Join(base.Path, api)
+	}
+
 	return base.String()
 }
 
 //修复删除失败
 func (client *Client) getDeleteRequestURL(api string) string {
-	var Delete_URL string;
-	if client.Endpoints.isInChina{
-	Delete_URL = "https://microsoftgraph.chinacloudapi.cn/v1.0"
-	}else{
-	Delete_URL = "https://graph.microsoft.com/v1.0"
+	var Delete_URL string
+	if client.Endpoints.isInChina {
+		Delete_URL = "https://microsoftgraph.chinacloudapi.cn/v1.0"
+	} else {
+		Delete_URL = "https://graph.microsoft.com/v1.0"
 	}
 	base, _ := url.Parse(Delete_URL)
 	if base == nil {
@@ -83,9 +96,9 @@ func (client *Client) ListChildren(ctx context.Context, path string) ([]FileInfo
 	var requestURL string
 	dst := strings.TrimPrefix(path, "/")
 	if dst == "" {
-		requestURL = client.getRequestURL("drive/root/children")
+		requestURL = client.getRequestURL("root/children")
 	} else {
-		requestURL = client.getRequestURL("drive/root:/" + dst + ":/children")
+		requestURL = client.getRequestURL("root:/" + dst + ":/children")
 	}
 
 	res, err := client.requestWithStr(ctx, "GET", requestURL+"?$top=999999999", "", 200)
@@ -119,10 +132,10 @@ func (client *Client) ListChildren(ctx context.Context, path string) ([]FileInfo
 func (client *Client) Meta(ctx context.Context, id string, path string) (*FileInfo, error) {
 	var requestURL string
 	if id != "" {
-		requestURL = client.getRequestURL("/drive/items/" + id)
+		requestURL = client.getRequestURL("items/" + id)
 	} else {
 		dst := strings.TrimPrefix(path, "/")
-		requestURL = client.getRequestURL("drive/root:/" + dst)
+		requestURL = client.getRequestURL("root:/" + dst)
 	}
 
 	res, err := client.requestWithStr(ctx, "GET", requestURL+"?expand=thumbnails", "", 200)
@@ -145,14 +158,13 @@ func (client *Client) Meta(ctx context.Context, id string, path string) (*FileIn
 
 // CreateUploadSession 创建分片上传会话
 func (client *Client) CreateUploadSession(ctx context.Context, dst string, opts ...Option) (string, error) {
-
 	options := newDefaultOption()
 	for _, o := range opts {
 		o.apply(options)
 	}
 
 	dst = strings.TrimPrefix(dst, "/")
-	requestURL := client.getRequestURL("drive/root:/" + dst + ":/createUploadSession")
+	requestURL := client.getRequestURL("root:/" + dst + ":/createUploadSession")
 	body := map[string]map[string]interface{}{
 		"item": {
 			"@microsoft.graph.conflictBehavior": options.conflictBehavior,
@@ -175,6 +187,33 @@ func (client *Client) CreateUploadSession(ctx context.Context, dst string, opts 
 	}
 
 	return uploadSession.UploadURL, nil
+}
+
+// GetSiteIDByURL 通过 SharePoint 站点 URL 获取站点ID
+func (client *Client) GetSiteIDByURL(ctx context.Context, siteUrl string) (string, error) {
+	siteUrlParsed, err := url.Parse(siteUrl)
+	if err != nil {
+		return "", err
+	}
+
+	hostName := siteUrlParsed.Hostname()
+	relativePath := strings.Trim(siteUrlParsed.Path, "/")
+	requestURL := client.getRequestURL(fmt.Sprintf("sites/%s:/%s", hostName, relativePath), WithDriverResource(false))
+	res, reqErr := client.requestWithStr(ctx, "GET", requestURL, "", 200)
+	if reqErr != nil {
+		return "", reqErr
+	}
+
+	var (
+		decodeErr error
+		siteInfo  Site
+	)
+	decodeErr = json.Unmarshal([]byte(res), &siteInfo)
+	if decodeErr != nil {
+		return "", decodeErr
+	}
+
+	return siteInfo.ID, nil
 }
 
 // GetUploadSessionStatus 查询上传会话状态
@@ -236,15 +275,21 @@ func (client *Client) UploadChunk(ctx context.Context, uploadURL string, chunk *
 
 // Upload 上传文件
 func (client *Client) Upload(ctx context.Context, dst string, size int, file io.Reader) error {
+	// 决定是否覆盖文件
+	overwrite := "replace"
+	if ctx.Value(fsctx.DisableOverwrite) != nil {
+		overwrite = "fail"
+	}
+
 	// 小文件，使用简单上传接口上传
 	if size <= int(SmallFileSize) {
-		_, err := client.SimpleUpload(ctx, dst, file, int64(size))
+		_, err := client.SimpleUpload(ctx, dst, file, int64(size), WithConflictBehavior(overwrite))
 		return err
 	}
 
 	// 大文件，进行分片
 	// 创建上传会话
-	uploadURL, err := client.CreateUploadSession(ctx, dst, WithConflictBehavior("replace"))
+	uploadURL, err := client.CreateUploadSession(ctx, dst, WithConflictBehavior(overwrite))
 	if err != nil {
 		return err
 	}
@@ -303,9 +348,15 @@ func (client *Client) DeleteUploadSession(ctx context.Context, uploadURL string)
 }
 
 // SimpleUpload 上传小文件到dst
-func (client *Client) SimpleUpload(ctx context.Context, dst string, body io.Reader, size int64) (*UploadResult, error) {
+func (client *Client) SimpleUpload(ctx context.Context, dst string, body io.Reader, size int64, opts ...Option) (*UploadResult, error) {
+	options := newDefaultOption()
+	for _, o := range opts {
+		o.apply(options)
+	}
+
 	dst = strings.TrimPrefix(dst, "/")
-	requestURL := client.getRequestURL("drive/root:/" + dst + ":/content")
+	requestURL := client.getRequestURL("root:/" + dst + ":/content")
+	requestURL += ("?@microsoft.graph.conflictBehavior=" + options.conflictBehavior)
 
 	res, err := client.request(ctx, "PUT", requestURL, body, request.WithContentLength(int64(size)),
 		request.WithTimeout(time.Duration(150)*time.Second),
@@ -319,7 +370,7 @@ func (client *Client) SimpleUpload(ctx context.Context, dst string, body io.Read
 			retried++
 			util.Log().Debug("文件[%s]上传失败[%s]，5秒钟后重试", dst, err)
 			time.Sleep(time.Duration(5) * time.Second)
-			return client.SimpleUpload(context.WithValue(ctx, fsctx.RetryCtx, retried), dst, body, size)
+			return client.SimpleUpload(context.WithValue(ctx, fsctx.RetryCtx, retried), dst, body, size, opts...)
 		}
 		return nil, err
 	}
@@ -361,7 +412,8 @@ func (client *Client) BatchDelete(ctx context.Context, dst []string) ([]string, 
 // 由于API限制，最多删除20个
 func (client *Client) Delete(ctx context.Context, dst []string) ([]string, error) {
 	body := client.makeBatchDeleteRequestsBody(dst)
-	res, err := client.requestWithStr(ctx, "POST", client.getDeleteRequestURL("$batch"), body, 200)
+	res, err := client.requestWithStr(ctx, "POST", client.getRequestURL("$batch",
+		WithDriverResource(false)), body, 200)
 	if err != nil {
 		return dst, err
 	}
@@ -386,7 +438,7 @@ func (client *Client) Delete(ctx context.Context, dst []string) ([]string, error
 func getDeleteFailed(res *BatchResponses) []string {
 	var failed = make([]string, 0, len(res.Responses))
 	for _, v := range res.Responses {
-		if v.Status != 204 {
+		if v.Status != 204 && v.Status != 404 {
 			failed = append(failed, v.ID)
 		}
 	}
@@ -399,11 +451,10 @@ func (client *Client) makeBatchDeleteRequestsBody(files []string) string {
 		Requests: make([]BatchRequest, len(files)),
 	}
 	//修复删除失败
-	var Delete_Full_URL string = client.Endpoints.EndpointURL + "/drive/root:/"
+	// var Delete_Full_URL string = client.Endpoints.EndpointURL + "/drive/root:/"
 	for i, v := range files {
 		v = strings.TrimPrefix(v, "/")
-		filePath, _ := url.Parse(Delete_Full_URL)
-		filePath.Path = strings.TrimPrefix(filePath.Path, "/v1.0")
+		filePath, _ := url.Parse("/" + client.Endpoints.DriverResource + "/root:/")
 		filePath.Path = path.Join(filePath.Path, v)
 		req.Requests[i] = BatchRequest{
 			ID:     v,
@@ -419,17 +470,7 @@ func (client *Client) makeBatchDeleteRequestsBody(files []string) string {
 // GetThumbURL 获取给定尺寸的缩略图URL
 func (client *Client) GetThumbURL(ctx context.Context, dst string, w, h uint) (string, error) {
 	dst = strings.TrimPrefix(dst, "/")
-	var (
-		cropOption string
-		requestURL string
-	)
-	if client.Endpoints.isInChina {
-		cropOption = "large"
-		requestURL = client.getRequestURL("drive/root:/"+dst+":/thumbnails/0") + "/" + cropOption
-	} else {
-		cropOption = fmt.Sprintf("c%dx%d_Crop", w, h)
-		requestURL = client.getRequestURL("drive/root:/"+dst+":/thumbnails") + "?select=" + cropOption
-	}
+	requestURL := client.getRequestURL("root:/"+dst+":/thumbnails/0") + "/large"
 
 	res, err := client.requestWithStr(ctx, "GET", requestURL, "", 200)
 	if err != nil {
@@ -450,7 +491,7 @@ func (client *Client) GetThumbURL(ctx context.Context, dst string, w, h uint) (s
 	}
 
 	if len(thumbRes.Value) == 1 {
-		if res, ok := thumbRes.Value[0][cropOption]; ok {
+		if res, ok := thumbRes.Value[0]["large"]; ok {
 			return res.(map[string]interface{})["url"].(string), nil
 		}
 	}
@@ -475,7 +516,7 @@ func (client *Client) MonitorUpload(uploadURL, callbackKey, path string, size ui
 		case <-time.After(time.Duration(ttl) * time.Second):
 			// 上传会话到期，仍未完成上传，创建占位符
 			client.DeleteUploadSession(context.Background(), uploadURL)
-			_, err := client.SimpleUpload(context.Background(), path, strings.NewReader(""), 0)
+			_, err := client.SimpleUpload(context.Background(), path, strings.NewReader(""), 0, WithConflictBehavior("replace"))
 			if err != nil {
 				util.Log().Debug("无法创建占位文件，%s", err)
 			}
@@ -523,7 +564,7 @@ func (client *Client) MonitorUpload(uploadURL, callbackKey, path string, size ui
 				// 取消上传会话，实测OneDrive取消上传会话后，客户端还是可以上传，
 				// 所以上传一个空文件占位，阻止客户端上传
 				client.DeleteUploadSession(context.Background(), uploadURL)
-				_, err := client.SimpleUpload(context.Background(), path, strings.NewReader(""), 0)
+				_, err := client.SimpleUpload(context.Background(), path, strings.NewReader(""), 0, WithConflictBehavior("replace"))
 				if err != nil {
 					util.Log().Debug("无法创建占位文件，%s", err)
 				}
@@ -552,7 +593,7 @@ func sysError(err error) *RespError {
 
 func (client *Client) request(ctx context.Context, method string, url string, body io.Reader, option ...request.Option) (string, *RespError) {
 	// 获取凭证
-	err := client.UpdateCredential(ctx)
+	err := client.UpdateCredential(ctx, conf.SystemConfig.Mode == "slave")
 	if err != nil {
 		return "", sysError(err)
 	}
