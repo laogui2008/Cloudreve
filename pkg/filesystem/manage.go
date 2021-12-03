@@ -180,8 +180,6 @@ func (fs *FileSystem) Delete(ctx context.Context, dirs, files []uint, force bool
 			// 已成功删除的文件
 			deletedFileIDs = append(deletedFileIDs, fs.FileTarget[i].ID)
 			deletedStorage[fs.FileTarget[i].ID] = fs.FileTarget[i].Size
-			// 删除缓存数据，解决同一文件短时间内上传下载删除再上传下载报错的问题
-			cache.Deletes([]string{fs.FileTarget[i].SourceName}, fmt.Sprintf("onedrive_source_%d_", fs.FileTarget[i].PolicyID))
 		}
 		// 全部文件
 		totalStorage[fs.FileTarget[i].ID] = fs.FileTarget[i].Size

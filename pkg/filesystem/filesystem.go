@@ -3,15 +3,14 @@ package filesystem
 import (
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
-	"net/url"
-	"sync"
-
 	"github.com/cloudreve/Cloudreve/v3/pkg/cluster"
 	"github.com/cloudreve/Cloudreve/v3/pkg/filesystem/driver"
 	"github.com/cloudreve/Cloudreve/v3/pkg/filesystem/driver/shadow/masterinslave"
 	"github.com/cloudreve/Cloudreve/v3/pkg/filesystem/driver/shadow/slaveinmaster"
+	"io"
+	"net/http"
+	"net/url"
+	"sync"
 
 	model "github.com/cloudreve/Cloudreve/v3/models"
 	"github.com/cloudreve/Cloudreve/v3/pkg/auth"

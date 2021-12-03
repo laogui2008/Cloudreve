@@ -2,12 +2,11 @@ package aria2
 
 import (
 	"database/sql"
-	"testing"
-
 	"github.com/cloudreve/Cloudreve/v3/pkg/mocks"
 	"github.com/cloudreve/Cloudreve/v3/pkg/mq"
 	"github.com/stretchr/testify/assert"
 	testMock "github.com/stretchr/testify/mock"
+	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	model "github.com/cloudreve/Cloudreve/v3/models"

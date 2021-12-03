@@ -4,6 +4,7 @@ go 1.13
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.3.3
+	github.com/HFO4/cloudreve v0.0.0-20201026073328-746aa3e8ef26
 	github.com/aliyun/aliyun-oss-go-sdk v2.0.5+incompatible
 	github.com/aws/aws-sdk-go v1.31.5
 	github.com/baiyubin/aliyun-sts-go-sdk v0.0.0-20180326062324-cfa1a18b161f // indirect

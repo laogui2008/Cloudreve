@@ -2,13 +2,6 @@ package local
 
 import (
 	"context"
-	"io"
-	"io/ioutil"
-	"net/url"
-	"os"
-	"strings"
-	"testing"
-
 	model "github.com/cloudreve/Cloudreve/v3/models"
 	"github.com/cloudreve/Cloudreve/v3/pkg/auth"
 	"github.com/cloudreve/Cloudreve/v3/pkg/conf"
@@ -16,6 +9,12 @@ import (
 	"github.com/cloudreve/Cloudreve/v3/pkg/util"
 	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/assert"
+	"io"
+	"io/ioutil"
+	"net/url"
+	"os"
+	"strings"
+	"testing"
 )
 
 func TestHandler_Put(t *testing.T) {

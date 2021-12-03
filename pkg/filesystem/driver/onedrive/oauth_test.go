@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"github.com/cloudreve/Cloudreve/v3/pkg/mocks/controllermock"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -11,8 +12,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/cloudreve/Cloudreve/v3/pkg/mocks/controllermock"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	model "github.com/cloudreve/Cloudreve/v3/models"

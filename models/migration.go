@@ -2,9 +2,6 @@ package model
 
 import (
 	"context"
-	"sort"
-	"strings"
-
 	"github.com/cloudreve/Cloudreve/v3/models/scripts/invoker"
 	"github.com/cloudreve/Cloudreve/v3/pkg/cache"
 	"github.com/cloudreve/Cloudreve/v3/pkg/conf"
@@ -13,6 +10,8 @@ import (
 	"github.com/gofrs/uuid"
 	"github.com/hashicorp/go-version"
 	"github.com/jinzhu/gorm"
+	"sort"
+	"strings"
 )
 
 // 是否需要迁移

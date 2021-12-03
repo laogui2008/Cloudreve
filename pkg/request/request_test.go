@@ -3,14 +3,13 @@ package request
 import (
 	"context"
 	"errors"
+	"github.com/cloudreve/Cloudreve/v3/pkg/cache"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/cloudreve/Cloudreve/v3/pkg/cache"
 
 	"github.com/cloudreve/Cloudreve/v3/pkg/auth"
 	"github.com/stretchr/testify/assert"

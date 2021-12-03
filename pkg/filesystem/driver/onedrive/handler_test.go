@@ -3,6 +3,7 @@ package onedrive
 import (
 	"context"
 	"fmt"
+	"github.com/cloudreve/Cloudreve/v3/pkg/auth"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -10,8 +11,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/cloudreve/Cloudreve/v3/pkg/auth"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	model "github.com/cloudreve/Cloudreve/v3/models"

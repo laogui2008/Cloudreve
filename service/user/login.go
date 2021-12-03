@@ -2,8 +2,6 @@ package user
 
 import (
 	"fmt"
-	"net/url"
-
 	model "github.com/cloudreve/Cloudreve/v3/models"
 	"github.com/cloudreve/Cloudreve/v3/pkg/cache"
 	"github.com/cloudreve/Cloudreve/v3/pkg/email"
@@ -12,6 +10,7 @@ import (
 	"github.com/cloudreve/Cloudreve/v3/pkg/util"
 	"github.com/gin-gonic/gin"
 	"github.com/pquerna/otp/totp"
+	"net/url"
 )
 
 // UserLoginService 管理用户登录的服务

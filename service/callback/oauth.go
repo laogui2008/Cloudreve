@@ -4,14 +4,13 @@ import (
 	"context"
 	"fmt"
 
-	"strings"
-
 	model "github.com/cloudreve/Cloudreve/v3/models"
 	"github.com/cloudreve/Cloudreve/v3/pkg/cache"
 	"github.com/cloudreve/Cloudreve/v3/pkg/filesystem/driver/onedrive"
 	"github.com/cloudreve/Cloudreve/v3/pkg/serializer"
 	"github.com/cloudreve/Cloudreve/v3/pkg/util"
 	"github.com/gin-gonic/gin"
+	"strings"
 )
 
 // OneDriveOauthService OneDrive 授权回调服务

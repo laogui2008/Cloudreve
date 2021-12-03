@@ -3,12 +3,11 @@ package scripts
 import (
 	"context"
 	"database/sql"
-	"testing"
-
 	"github.com/DATA-DOG/go-sqlmock"
 	model "github.com/cloudreve/Cloudreve/v3/models"
 	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 var mock sqlmock.Sqlmock

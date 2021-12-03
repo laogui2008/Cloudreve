@@ -2,9 +2,8 @@ package task
 
 import (
 	"errors"
-	"testing"
-
 	testMock "github.com/stretchr/testify/mock"
+	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	model "github.com/cloudreve/Cloudreve/v3/models"
