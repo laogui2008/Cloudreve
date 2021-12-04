@@ -12,7 +12,6 @@ import (
 	"github.com/cloudreve/Cloudreve/v3/pkg/hashid"
 	"github.com/cloudreve/Cloudreve/v3/pkg/serializer"
 	"github.com/cloudreve/Cloudreve/v3/pkg/util"
-    "github.com/cloudreve/Cloudreve/v3/pkg/cache"
 )
 
 /* =================
@@ -464,118 +463,6 @@ func (fs *FileSystem) SaveTo(ctx context.Context, path string) error {
 	fs.User.IncreaseStorageWithoutCheck(totalSize)
 	if err != nil {
 		return ErrFileExisted.WithError(err)
-	}
-
-	return nil
-}
-
-// 删除数据，根据deleteSourceFileFlag标识，决定是否删除源文件
-func (fs *FileSystem) DeleteDBAndSourceFile(ctx context.Context, dirs, files []uint, force bool, deleteSourceFileFlag bool) error {
-	// 已删除的总容量,map用于去重
-	var deletedStorage = make(map[uint]uint64)
-	var totalStorage = make(map[uint]uint64)
-	// 已删除的文件ID
-	var deletedFileIDs = make([]uint, 0, len(fs.FileTarget))
-	// 删除失败的文件的父目录ID
-
-	// 所有文件的ID
-	var allFileIDs = make([]uint, 0, len(fs.FileTarget))
-
-	// 列出要删除的目录
-	if len(dirs) > 0 {
-		err := fs.ListDeleteDirs(ctx, dirs)
-		if err != nil {
-			return err
-		}
-	}
-
-	// 列出要删除的文件
-	if len(files) > 0 {
-		err := fs.ListDeleteFiles(ctx, files)
-		if err != nil {
-			return err
-		}
-	}
-
-	// 去除待删除文件中包含软连接的部分
-	filesToBeDelete, err := model.RemoveFilesWithSoftLinks(fs.FileTarget)
-	if err != nil {
-		return ErrDBListObjects.WithError(err)
-	}
-
-	// 根据存储策略将文件分组
-	policyGroup := fs.GroupFileByPolicy(ctx, filesToBeDelete)
-
-	// 按照存储策略分组删除对象
-	// failed := fs.deleteGroupedFile(ctx, policyGroup)
-
-	var failed map[uint][]string
-	if deleteSourceFileFlag {
-		// println("删除源文件")
-		// 按照存储策略分组删除对象
-		failed = fs.deleteGroupedFile(ctx, policyGroup)
-	} else {
-		// println("不删除源文件")
-		failed = make(map[uint][]string, len(policyGroup))
-	}
-
-	// 整理删除结果
-	for i := 0; i < len(fs.FileTarget); i++ {
-		if !util.ContainsString(failed[fs.FileTarget[i].PolicyID], fs.FileTarget[i].SourceName) {
-			// 已成功删除的文件
-			deletedFileIDs = append(deletedFileIDs, fs.FileTarget[i].ID)
-			deletedStorage[fs.FileTarget[i].ID] = fs.FileTarget[i].Size
-			// 删除缓存数据，解决同一文件短时间内上传下载删除再上传下载报错的问题
-			cache.Deletes([]string{fs.FileTarget[i].SourceName}, fmt.Sprintf("onedrive_source_%d_", fs.FileTarget[i].PolicyID))
-		}
-		// 全部文件
-		totalStorage[fs.FileTarget[i].ID] = fs.FileTarget[i].Size
-		allFileIDs = append(allFileIDs, fs.FileTarget[i].ID)
-	}
-
-	// 如果强制删除，则将全部文件视为删除成功
-	if force {
-		deletedFileIDs = allFileIDs
-		deletedStorage = totalStorage
-	}
-
-	// 删除文件记录
-	err = model.DeleteFileByIDs(deletedFileIDs)
-	if err != nil {
-		return ErrDBDeleteObjects.WithError(err)
-	}
-
-	// 删除文件记录对应的分享记录
-	model.DeleteShareBySourceIDs(deletedFileIDs, false)
-
-	// 归还容量
-	var total uint64
-	for _, value := range deletedStorage {
-		total += value
-	}
-	fs.User.DeductionStorage(total)
-
-	// 如果文件全部删除成功，继续删除目录
-	if len(deletedFileIDs) == len(allFileIDs) {
-		var allFolderIDs = make([]uint, 0, len(fs.DirTarget))
-		for _, value := range fs.DirTarget {
-			allFolderIDs = append(allFolderIDs, value.ID)
-		}
-		err = model.DeleteFolderByIDs(allFolderIDs)
-		if err != nil {
-			return ErrDBDeleteObjects.WithError(err)
-		}
-
-		// 删除目录记录对应的分享记录
-		model.DeleteShareBySourceIDs(allFolderIDs, true)
-	}
-
-	if notDeleted := len(fs.FileTarget) - len(deletedFileIDs); notDeleted > 0 {
-		return serializer.NewError(
-			serializer.CodeNotFullySuccess,
-			fmt.Sprintf("有 %d 个文件未能成功删除", notDeleted),
-			nil,
-		)
 	}
 
 	return nil
