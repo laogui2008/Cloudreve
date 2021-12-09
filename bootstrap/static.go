@@ -9,8 +9,7 @@ import (
 
 	"github.com/cloudreve/Cloudreve/v3/pkg/conf"
 	"github.com/cloudreve/Cloudreve/v3/pkg/util"
-
-	// "github.com/cloudreve/Cloudreve/v3/statik"
+	_ "github.com/cloudreve/Cloudreve/v3/statik"
 	"github.com/gin-contrib/static"
 	"github.com/rakyll/statik/fs"
 )
