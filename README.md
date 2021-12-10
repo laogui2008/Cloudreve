@@ -33,6 +33,15 @@
 
 ![Screenshot](https://raw.githubusercontent.com/cloudreve/docs/master/images/homepage.png)
 
+## ::star2:: 更新记录(个人自用)
+
+* 2021-03-06 删除文件时，增加checkbox选项，让用户选择是否删除源文件  
+为何增加这个？在实际使用中，部分数据是手动导入的，后期不想在网盘中展示了，此时只想删除数据库的数据，不删除存储端的数据  
+&nbsp;
+* 2020-10-07 增加视频在线观看时挂载字幕，字幕文件名称要与视频文件名称一样，后缀为vtt格式  
+播放器DPlayer目前只支持webvtt，加载字幕顺序：[".zh.vtt", ".ZH.vtt", ".vtt", ".en.vtt", ".EN.vtt"]  
+具体的代码在对应的前端项目[frontend](https://github.com/laogui2008/frontend)
+
 ## :sparkles: 特性
 
 * :cloud: 支持本机、从机、七牛、阿里云 OSS、腾讯云 COS、又拍云、OneDrive (包括世纪互联版) 作为存储端
